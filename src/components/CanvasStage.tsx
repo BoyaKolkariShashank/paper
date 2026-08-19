@@ -1108,6 +1108,43 @@ export default function CanvasStage(p: Props) {
     p.items,
   ])
 
+  useEffect(() => {
+    let cancelled = false
+
+    const restoreMissingPreviews = async () => {
+      const files = p.items.filter(item =>
+        item.type === "file" && item.fileData && item.previewText === undefined
+      )
+
+      for (const item of files) {
+        try {
+          const response = await fetch(item.fileData!)
+          const blob = await response.blob()
+          const file = new File([blob], item.fileName ?? "document", {
+            type: item.mimeType || blob.type,
+          })
+          const previewText = await getDocumentPreview(file)
+          if (!cancelled) {
+            p.updateItem(item.id, {
+              previewText: previewText || "Preview unavailable. Double-click to open.",
+            })
+          }
+        } catch {
+          if (!cancelled) {
+            p.updateItem(item.id, {
+              previewText: "Preview unavailable. Double-click to open.",
+            })
+          }
+        }
+      }
+    }
+
+    void restoreMissingPreviews()
+    return () => {
+      cancelled = true
+    }
+  }, [p.items, p.updateItem])
+
   /*
    * -------------------------------------------------------
    * OBJECTS
@@ -1151,6 +1188,20 @@ export default function CanvasStage(p: Props) {
         : p.tool === "pen"
           ? "cursor-crosshair"
           : "cursor-crosshair"
+
+  const openFile = (item: CanvasItem) => {
+    if (!item.fileData) return
+
+    const link = document.createElement("a")
+    link.href = item.fileData
+    if (item.mimeType === "application/pdf") {
+      link.target = "_blank"
+      link.rel = "noreferrer"
+    } else {
+      link.download = item.fileName ?? "infinite-paper-file"
+    }
+    link.click()
+  }
 
   return (
     <div
@@ -1205,12 +1256,6 @@ export default function CanvasStage(p: Props) {
             )
           }
 
-          if (item?.type === "file" && item.fileData) {
-            const link = document.createElement("a")
-            link.href = item.fileData
-            link.download = item.fileName ?? "infinite-paper-file"
-            link.click()
-          }
         }}
       >
 
@@ -1573,14 +1618,14 @@ export default function CanvasStage(p: Props) {
                     <ImageNode
                       key={item.id}
                       item={{ ...item, src: item.fileData }}
-                      common={common}
+                      common={{ ...common, onDblClick: () => openFile(item) }}
                     />
                   )
                 }
 
                 const extension = item.fileName?.split(".").pop()?.toUpperCase() ?? "FILE"
                 return (
-                  <Group key={item.id} {...common}>
+                  <Group key={item.id} {...common} onDblClick={() => openFile(item)}>
                     <Rect
                       width={item.width}
                       height={item.height}
@@ -1596,7 +1641,7 @@ export default function CanvasStage(p: Props) {
                     <Rect x={20} y={20} width={54} height={68} fill="#e2e8f0" cornerRadius={8} />
                     <Text x={20} y={42} width={54} text={extension.slice(0, 5)} align="center" fontSize={12} fontStyle="bold" fill="#475569" />
                     <Text x={92} y={24} width={item.width - 112} text={item.fileName ?? "Untitled file"} fontSize={18} fontStyle="bold" fill="#0f172a" wrap="word" ellipsis />
-                    <Text x={92} y={78} width={item.width - 112} text="Double-click to download" fontSize={12} fill="#64748b" />
+                    <Text x={92} y={78} width={item.width - 112} text={item.mimeType === "application/pdf" ? "Double-click to open PDF" : "Double-click to download"} fontSize={12} fill="#64748b" />
                     {item.previewText && (
                       <Text x={20} y={112} width={item.width - 40} height={item.height - 150} text={item.previewText} fontSize={13} fill="#334155" lineHeight={1.35} wrap="word" ellipsis />
                     )}
