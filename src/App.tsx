@@ -564,6 +564,16 @@ export default function App() {
     }
   }, [])
 
+  const newDocument = useCallback(() => {
+    if (itemsRef.current.length && !window.confirm("Start a new paper? Unsaved changes will be cleared.")) return
+    setHistory([])
+    setFuture([])
+    setSelectedIds([])
+    setItems([])
+    itemsRef.current = []
+    setSaved(false)
+  }, [])
+
   const exportDocument = useCallback(() => {
     const projectDocument = JSON.stringify({
       app: "infinite-paper",
@@ -954,6 +964,7 @@ export default function App() {
 
         onExport={exportDocument}
         onShare={shareDocument}
+        onNew={newDocument}
         onImport={importDocument}
 
         canUndo={history.length > 0}

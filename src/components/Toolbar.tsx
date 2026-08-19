@@ -1,9 +1,10 @@
 import {
-  MousePointer2, Type, ImagePlus, FilePlus, Square, Circle, Minus, ArrowUpRight,
+  MousePointer2, Type, ImagePlus, FilePlus, File, Square, Circle, Minus, ArrowUpRight,
   PenTool, Table2, Undo2, Redo2, Copy, Clipboard, Trash2,
   BringToFront, SendToBack, ZoomIn, ZoomOut, Maximize2, Download, Upload, Share2
 } from "lucide-react"
 import type { Tool } from "../types"
+import { useState } from "react"
 
 type Props = {
   tool: Tool
@@ -21,6 +22,7 @@ type Props = {
   onBack: () => void
   onExport: () => void
   onShare: () => void
+  onNew: () => void
   onImport: (file: File) => void
   canUndo: boolean
   canRedo: boolean
@@ -41,6 +43,13 @@ const tools: { id: Tool; label: string; icon: typeof MousePointer2 }[] = [
 ]
 
 export default function Toolbar(p: Props) {
+  const [fileMenuOpen, setFileMenuOpen] = useState(false)
+
+  const runFileAction = (action: () => void) => {
+    action()
+    setFileMenuOpen(false)
+  }
+
   return (
     <header className="h-14 border-b border-slate-200/80 bg-white/90 backdrop-blur flex items-center px-4 gap-3 shrink-0 z-20">
       <div className="flex items-center gap-2 mr-3">
@@ -52,6 +61,53 @@ export default function Toolbar(p: Props) {
       </div>
 
       <div className="h-7 w-px bg-slate-200" />
+
+      <div className="relative">
+        <button
+          className="flex h-8 items-center gap-2 rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          title="File menu"
+          onClick={() => setFileMenuOpen(open => !open)}
+        >
+          <File size={16}/>
+          <span>File</span>
+        </button>
+        {fileMenuOpen && (
+          <div className="absolute left-0 top-10 z-50 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+            <button className="file-menu-item" onClick={() => runFileAction(p.onNew)}>New</button>
+            <label className="file-menu-item cursor-pointer">
+              Open
+              <input
+                type="file"
+                accept=".paper,.paper.json,application/x-infinite-paper,application/json"
+                className="hidden"
+                onChange={event => {
+                  const file = event.target.files?.[0]
+                  if (file) p.onImport(file)
+                  event.currentTarget.value = ""
+                  setFileMenuOpen(false)
+                }}
+              />
+            </label>
+            <div className="my-1 border-t border-slate-100" />
+            <button className="file-menu-item" onClick={() => runFileAction(p.onExport)}>Save / Export</button>
+            <label className="file-menu-item cursor-pointer">
+              Import
+              <input
+                type="file"
+                accept=".paper,.paper.json,application/x-infinite-paper,application/json"
+                className="hidden"
+                onChange={event => {
+                  const file = event.target.files?.[0]
+                  if (file) p.onImport(file)
+                  event.currentTarget.value = ""
+                  setFileMenuOpen(false)
+                }}
+              />
+            </label>
+            <button className="file-menu-item" onClick={() => runFileAction(p.onShare)}>Share</button>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center gap-1">
         <button className="icon-button" title="Undo" onClick={p.onUndo} disabled={!p.canUndo}><Undo2 size={16}/></button>

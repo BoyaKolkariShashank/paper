@@ -47,5 +47,9 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 }
 .mini-active { @apply bg-slate-900 text-white border-slate-900 hover:bg-slate-900; }
 
+.file-menu-item {
+  @apply flex w-full items-center rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100;
+}
+
 [contenteditable] p { margin: 0; }
 [contenteditable]:empty:before { content: "Type here…"; color: #94a3b8; }
