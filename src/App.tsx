@@ -1050,7 +1050,7 @@ export default function App() {
 
       {/* PROFESSIONAL STATUS BAR */}
 
-      <footer className="h-9 shrink-0 border-t border-slate-200 bg-white flex items-center justify-between px-4 text-[11px] text-slate-400">
+      <footer className="app-footer h-9 shrink-0 border-t border-slate-200 bg-white flex items-center justify-between px-4 text-[11px] text-slate-400">
 
         <div className="flex items-center gap-4">
 

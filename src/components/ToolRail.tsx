@@ -3,7 +3,7 @@ import { tools } from "./Toolbar"
 
 export default function ToolRail({ tool, setTool }: { tool: Tool; setTool: (t: Tool) => void }) {
   return (
-    <aside className="w-16 shrink-0 border-r border-slate-200/80 bg-white flex flex-col items-center py-3 gap-1 z-10">
+    <aside className="tool-rail w-16 shrink-0 border-r border-slate-200/80 bg-white flex flex-col items-center py-3 gap-1 z-10">
       {tools.map(({ id, label, icon: Icon }) => (
         <button
           key={id}

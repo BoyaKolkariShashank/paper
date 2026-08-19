@@ -40,6 +40,10 @@ export type CanvasItem = {
   mimeType?: string
   fileData?: string
   previewText?: string
+  previewSheets?: Array<{
+    name: string
+    rows: string[][]
+  }>
   table?: {
     rows: number
     cols: number

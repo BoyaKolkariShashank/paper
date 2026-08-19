@@ -10,7 +10,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 1024px; overflow: hidden; }
+body { margin: 0; min-width: 0; overflow: hidden; }
 
 button, input, select { font: inherit; }
 button:disabled { opacity: .35; cursor: not-allowed; }
@@ -53,3 +53,17 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 
 [contenteditable] p { margin: 0; }
 [contenteditable]:empty:before { content: "Type here…"; color: #94a3b8; }
+
+.app-toolbar { overflow-x: auto; scrollbar-width: none; }
+.app-toolbar::-webkit-scrollbar { display: none; }
+
+@media (max-width: 640px) {
+  .app-toolbar { min-width: 100%; padding-left: 8px; padding-right: 8px; gap: 6px; }
+  .app-toolbar > * { flex-shrink: 0; }
+  .app-brand-subtitle { display: none; }
+  .app-brand { margin-right: 4px; }
+  .tool-rail { width: 52px; }
+  .rail-button { width: 44px; height: 44px; }
+  .inspector-panel { width: 220px; padding: 12px; }
+  .app-footer { display: none; }
+}

@@ -65,40 +65,62 @@ const getDocumentPreview = async (file: File) => {
   const name = file.name.toLowerCase()
   const buffer = await file.arrayBuffer()
 
+  if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".json")) {
+    return new TextDecoder().decode(buffer)
+  }
+
   if (name.endsWith(".docx")) {
     const result = await mammoth.extractRawText({ arrayBuffer: buffer })
-    return result.value.slice(0, 900)
+    return result.value
   }
 
   if (name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".csv")) {
-    const workbook = new ExcelJS.Workbook()
     if (name.endsWith(".csv")) {
       const text = new TextDecoder().decode(buffer)
-      return text.slice(0, 900)
+      return text
     }
+    const workbook = new ExcelJS.Workbook()
     await workbook.xlsx.load(buffer)
-    const worksheet = workbook.worksheets[0]
     const rows: string[] = []
-    worksheet.eachRow(row => {
-      const values = Array.isArray(row.values) ? row.values.slice(1) : []
-      rows.push(values.map(value => String(value ?? "")).join("\t"))
+    workbook.worksheets.forEach(worksheet => {
+      rows.push(`[${worksheet.name}]`)
+      worksheet.eachRow(row => {
+        const values = Array.isArray(row.values) ? row.values.slice(1) : []
+        rows.push(values.map(value => String(value ?? "")).join("\t"))
+      })
     })
-    return rows.join("\n").slice(0, 900)
+    return rows.join("\n")
   }
 
   if (name.endsWith(".pdf")) {
     const pdf = await pdfjsLib.getDocument({
       data: new Uint8Array(buffer),
     }).promise
-    const page = await pdf.getPage(1)
-    const content = await page.getTextContent()
-    return content.items
-      .map(item => "str" in item ? item.str : "")
-      .join(" ")
-      .slice(0, 900)
+    const pages: string[] = []
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber)
+      const content = await page.getTextContent()
+      pages.push(`Page ${pageNumber}\n${content.items
+        .map(item => "str" in item ? item.str : "")
+        .join(" ")}`)
+    }
+    return pages.join("\n\n")
   }
 
   return ""
+}
+
+const getSpreadsheetSheets = async (file: File) => {
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(await file.arrayBuffer())
+  return workbook.worksheets.map(worksheet => {
+    const rows: string[][] = []
+    worksheet.eachRow(row => {
+      const values = Array.isArray(row.values) ? row.values.slice(1) : []
+      rows.push(values.map(value => String(value ?? "")))
+    })
+    return { name: worksheet.name, rows }
+  })
 }
 
 export default function CanvasStage(p: Props) {
@@ -702,6 +724,17 @@ export default function CanvasStage(p: Props) {
 
     const pos = getWorldPosition(e)
 
+    if (
+      e.evt.pointerType === "touch" &&
+      (target === stage || target.name() === "canvas-background")
+    ) {
+      e.evt.preventDefault()
+      stage.draggable(true)
+      setIsPanning(true)
+      stage.startDrag()
+      return
+    }
+
     /*
      * PEN
      */
@@ -745,21 +778,6 @@ export default function CanvasStage(p: Props) {
           width: 0,
           height: 0,
         })
-
-        return
-      }
-
-      if (p.tool === "image") {
-        ;(
-          window as any
-        ).__infinitePaperPendingImage =
-          pos
-
-        document
-          .getElementById(
-            "image-upload-input"
-          )
-          ?.click()
 
         return
       }
@@ -890,6 +908,7 @@ export default function CanvasStage(p: Props) {
       setIsPanning(false)
 
       stage?.stopDrag()
+      stage?.draggable(false)
 
       return
     }
@@ -1124,9 +1143,13 @@ export default function CanvasStage(p: Props) {
             type: item.mimeType || blob.type,
           })
           const previewText = await getDocumentPreview(file)
+          const previewSheets = /\.(xlsx|xls)$/i.test(file.name)
+            ? await getSpreadsheetSheets(file)
+            : undefined
           if (!cancelled) {
             p.updateItem(item.id, {
               previewText: previewText || "Preview unavailable. Double-click to open.",
+              previewSheets,
             })
           }
         } catch {
@@ -1194,12 +1217,7 @@ export default function CanvasStage(p: Props) {
 
     const link = document.createElement("a")
     link.href = item.fileData
-    if (item.mimeType === "application/pdf") {
-      link.target = "_blank"
-      link.rel = "noreferrer"
-    } else {
-      link.download = item.fileName ?? "infinite-paper-file"
-    }
+    link.download = item.fileName ?? "infinite-paper-file"
     link.click()
   }
 
@@ -1207,6 +1225,7 @@ export default function CanvasStage(p: Props) {
     <div
       ref={wrapRef}
       className={`relative flex-1 overflow-hidden canvas-grid ${cursorClass}`}
+      style={{ touchAction: "none" }}
       onContextMenu={e =>
         e.preventDefault()
       }
@@ -1641,7 +1660,7 @@ export default function CanvasStage(p: Props) {
                     <Rect x={20} y={20} width={54} height={68} fill="#e2e8f0" cornerRadius={8} />
                     <Text x={20} y={42} width={54} text={extension.slice(0, 5)} align="center" fontSize={12} fontStyle="bold" fill="#475569" />
                     <Text x={92} y={24} width={item.width - 112} text={item.fileName ?? "Untitled file"} fontSize={18} fontStyle="bold" fill="#0f172a" wrap="word" ellipsis />
-                    <Text x={92} y={78} width={item.width - 112} text={item.mimeType === "application/pdf" ? "Double-click to open PDF" : "Double-click to download"} fontSize={12} fill="#64748b" />
+                    <Text x={92} y={78} width={item.width - 112} text="Select to preview · double-click to download" fontSize={12} fill="#64748b" />
                     {item.previewText && (
                       <Text x={20} y={112} width={item.width - 40} height={item.height - 150} text={item.previewText} fontSize={13} fill="#334155" lineHeight={1.35} wrap="word" ellipsis />
                     )}
@@ -1859,6 +1878,8 @@ export default function CanvasStage(p: Props) {
               transformerRef
             }
             rotateEnabled
+            rotateAnchorOffset={28}
+            rotateAnchorCursor="crosshair"
             enabledAnchors={[
               "top-left",
               "top-center",
@@ -1887,7 +1908,10 @@ export default function CanvasStage(p: Props) {
             borderStroke="#2563eb"
             anchorStroke="#2563eb"
             anchorFill="#ffffff"
-            anchorSize={9}
+            anchorSize={13}
+            anchorCornerRadius={7}
+            anchorStrokeWidth={2}
+            shouldOverdrawWholeArea
             borderDash={[
               4,
               4,
@@ -2129,127 +2153,22 @@ export default function CanvasStage(p: Props) {
           )
         })()}
 
-      {/* IMAGE UPLOAD */}
-
-      <input
-        id="image-upload-input"
-        type="file"
-        accept="image/*"
-        className="hidden"
-
-        onChange={e => {
-          const file =
-            e.target.files?.[0]
-
-          if (!file) return
-
-          const reader =
-            new FileReader()
-
-          reader.onload = () => {
-            const pos =
-              (
-                window as any
-              )
-                .__infinitePaperPendingImage ??
-              {
-                x: 120,
-                y: 120,
-              }
-
-            const img =
-              new Image()
-
-            img.onload = () => {
-              const max =
-                520
-
-              const scale =
-                Math.min(
-                  1,
-                  max /
-                    img.width
-                )
-
-              const item: CanvasItem =
-                {
-                  id: createId(
-                    "image"
-                  ),
-
-                  type: "image",
-
-                  x: snap(
-                    pos.x
-                  ),
-
-                  y: snap(
-                    pos.y
-                  ),
-
-                  width:
-                    img.width *
-                    scale,
-
-                  height:
-                    img.height *
-                    scale,
-
-                  rotation: 0,
-
-                  zIndex:
-                    p.items
-                      .length +
-                    1,
-
-                  src:
-                    reader.result as string,
-
-                  style: {
-                    stroke:
-                      "#e2e8f0",
-
-                    strokeWidth:
-                      1,
-                  },
-                }
-
-              p.addItem(item)
-
-              p.setTool(
-                "select"
-              )
-
-              p.setSelectedIds([
-                item.id,
-              ])
-            }
-
-            img.src =
-              reader.result as string
-          }
-
-          reader.readAsDataURL(
-            file
-          )
-
-          e.currentTarget.value =
-            ""
-        }}
-      />
-
       <input
         id="file-upload-input"
         type="file"
-        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp"
+        accept="*/*"
         className="hidden"
         onChange={async event => {
           const file = event.target.files?.[0]
           if (!file) return
 
           let previewText = ""
+          let previewSheets: CanvasItem["previewSheets"]
           try {
             previewText = await getDocumentPreview(file)
+            if (/\.(xlsx|xls)$/i.test(file.name)) {
+              previewSheets = await getSpreadsheetSheets(file)
+            }
           } catch (error) {
             console.warn("Unable to preview document:", error)
           }
@@ -2270,6 +2189,7 @@ export default function CanvasStage(p: Props) {
               mimeType: file.type || "application/octet-stream",
               fileData: reader.result as string,
               previewText,
+              previewSheets,
             }
             p.addItem(item)
             p.setTool("select")
